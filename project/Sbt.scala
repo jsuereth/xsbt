@@ -31,6 +31,16 @@ object Sbt extends Build
 	lazy val root: Project = Project("root", file("."), aggregate = nonRoots ) settings( rootSettings : _*) configs( Sxr.sxrConf, Proguard )
 	lazy val nonRoots = projects.filter(_ != root).map(p => LocalProject(p.id))
 
+  // Aggregate project for incremental compiler
+  lazy val incrementalCompilerAll = Project("incremental-compiler-all", file("inc-all"),
+     aggregate = Seq(
+       classpathSub,
+       apiSub, 
+       ioSub,
+       logSub,
+       relationSub,
+       compileIncrementalSub))
+
 	/* ** Subproject declarations ** */
 
 		// defines the Java interfaces through which the launcher and the launched application communicate
