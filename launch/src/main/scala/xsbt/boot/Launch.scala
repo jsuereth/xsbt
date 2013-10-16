@@ -88,6 +88,9 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 	def getScala(version: String): xsbti.ScalaProvider = getScala(version, "")
 	def getScala(version: String, reason: String): xsbti.ScalaProvider = getScala(version, reason, ScalaOrg)
 	def getScala(version: String, reason: String, scalaOrg: String) = scalaProviders((scalaOrg, version), reason)
+	def server(id: xsbti.ApplicationID, scalaVersion: String): xsbti.ServerProvider = server(id, Option(scalaVersion))
+	def server(id: xsbti.ApplicationID, scalaVersion: Option[String]): xsbti.ServerProvider =
+      getServerProvider(id, scalaVersion, false)
 	def app(id: xsbti.ApplicationID, version: String): xsbti.AppProvider = app(id, Option(version))
     def app(id: xsbti.ApplicationID, scalaVersion: Option[String]): xsbti.AppProvider =
       getAppProvider(id, scalaVersion, false)
@@ -139,10 +142,17 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 		new UpdateConfiguration(bootDirectory, ivyOptions.ivyHome, scalaOrg, version, repositories, checksumsList)
 
 	final def getAppProvider(id: xsbti.ApplicationID, explicitScalaVersion: Option[String], forceAppUpdate: Boolean): xsbti.AppProvider =
-		locked(new Callable[xsbti.AppProvider] { def call = getAppProvider0(id, explicitScalaVersion, forceAppUpdate) })
+		locked(new Callable[xsbti.AppProvider] { 
+		  def call = resolveAndCheckModule(id, explicitScalaVersion, forceAppUpdate)(checkedAppProvider) 
+		})
 
-	@tailrec private[this] final def getAppProvider0(id: xsbti.ApplicationID, explicitScalaVersion: Option[String], forceAppUpdate: Boolean): xsbti.AppProvider =
-	{
+	final def getServerProvider(id: xsbti.ApplicationID, explicitScalaVersion: Option[String], forceAppUpdate: Boolean): xsbti.ServerProvider =
+		locked(new Callable[xsbti.ServerProvider] {
+		  def call = resolveAndCheckModule(id, explicitScalaVersion, forceAppUpdate)(checkedServerProvider)
+		})
+	
+	type CheckResolution[T] = (xsbti.ApplicationID, xsbt.boot.RetrievedModule, xsbti.ScalaProvider) => (Iterable[String], T)
+    @tailrec private[this] final def resolveAndCheckModule[T](id: xsbti.ApplicationID, explicitScalaVersion: Option[String], forceAppUpdate: Boolean)(check: CheckResolution[T]): T = {
 		val app = appModule(id, explicitScalaVersion, true, "app")
 		val baseDirs = (base: File) => appBaseDirs(base, id)
 		def retrieve() = {
@@ -159,14 +169,15 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 		val scalaVersion = getOrError(strictOr(explicitScalaVersion, retrievedApp.detectedScalaVersion), "No Scala version specified or detected")
 		val scalaProvider = getScala(scalaVersion, "(for " + id.name + ")")
 
-		val (missing, appProvider) = checkedAppProvider(id, retrievedApp, scalaProvider)
+		val (missing, appProvider) = check(id, retrievedApp, scalaProvider)
 		if(missing.isEmpty)
 			appProvider
 		else if(retrievedApp.fresh)
 			app.retrieveCorrupt(missing)
 		else
-			getAppProvider0(id, explicitScalaVersion, true)
+			resolveAndCheckModule(id, explicitScalaVersion, true)(check)
 	}
+	
 	def scalaHome(scalaOrg: String, scalaVersion: Option[String]): File = new File(bootDirectory, baseDirectoryName(scalaOrg, scalaVersion))
 	def appHome(id: xsbti.ApplicationID, scalaVersion: Option[String]): File = appDirectory(scalaHome(ScalaOrg, scalaVersion), id)
 	def checkedAppProvider(id: xsbti.ApplicationID, module: RetrievedModule, scalaProvider: xsbti.ScalaProvider): (Iterable[String], xsbti.AppProvider) =
@@ -175,9 +186,17 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 		val missing = getMissing(p.loader, id.mainClass :: Nil)
 		(missing, p)				
 	}
+	def checkedServerProvider(id: xsbti.ApplicationID, module: RetrievedModule, scalaProvider: xsbti.ScalaProvider): (Iterable[String], xsbti.ServerProvider) =
+	{
+		val p = serverProvider(id, module, scalaProvider, appHome(id, Some(scalaProvider.version)))
+		val missing = getMissing(p.loader, id.mainClass :: Nil)
+		(missing, p)
+	}
 	private[this] def locked[T](c: Callable[T]): T = Locks(orNull(updateLockFile), c)
 	def getScalaProvider(scalaOrg: String, scalaVersion: String, reason: String): xsbti.ScalaProvider =
-		locked(new Callable[xsbti.ScalaProvider] { def call = getScalaProvider0(scalaOrg, scalaVersion, reason) })
+		locked(new Callable[xsbti.ScalaProvider] { 
+		  def call = getScalaProvider0(scalaOrg, scalaVersion, reason) 
+		})
 
 	private[this] final def getScalaProvider0(scalaOrg: String, scalaVersion: String, reason: String) =
 	{
@@ -247,6 +266,21 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 
 		lazy val components = componentProvider(appHome)
 	}
+	def serverProvider(appID: xsbti.ApplicationID, app: RetrievedModule, scalaProvider0: xsbti.ScalaProvider, appHome: File): xsbti.ServerProvider = new xsbti.ServerProvider
+	{
+		val scalaProvider = scalaProvider0
+		val id = appID
+		def mainClasspath = app.fullClasspath
+		lazy val loader = app.createLoader(scalaProvider.loader)
+		lazy val mainClass: Class[T] forSome { type T <: xsbti.ServerMain } =
+		{
+			val c = Class.forName(id.mainClass, true, loader)
+			c.asSubclass(classOf[xsbti.ServerMain])
+		}
+		def newMain(): xsbti.ServerMain = mainClass.newInstance
+
+		lazy val components = componentProvider(appHome)
+	}
 	def componentProvider(appHome: File) = new ComponentProvider(appHome, lockBoot)
 
 	def scalaProvider(scalaVersion: String, module: RetrievedModule, parentLoader: ClassLoader, scalaLibDir: File): xsbti.ScalaProvider = new xsbti.ScalaProvider
@@ -260,6 +294,7 @@ class Launch private[xsbt](val bootDirectory: File, val lockBoot: Boolean, val i
 		def jars = module.fullClasspath
 		
 		def app(id: xsbti.ApplicationID) = Launch.this.app(id, Some(scalaVersion))
+		def server(id: xsbti.ApplicationID) = Launch.this.server(id, Some(scalaVersion))
 	}
 
 	def appModule(id: xsbti.ApplicationID, scalaVersion: Option[String], getClassifiers: Boolean, tpe: String): ModuleDefinition = new ModuleDefinition(

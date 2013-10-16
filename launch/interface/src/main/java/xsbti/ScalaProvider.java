@@ -5,6 +5,7 @@ import java.io.File;
 /** Provides access to the jars and classes for a particular version of Scala.*/
 public interface ScalaProvider
 {
+	/** The launcher used to provide this version of scala. */
 	public Launcher launcher();
 	/** The version of Scala this instance provides.*/
 	public String version();
@@ -26,4 +27,10 @@ public interface ScalaProvider
 	* the application given by 'id'.  This method will retrieve the application if it has not already
 	* been retrieved.*/
 	public AppProvider app(ApplicationID id);
+	
+	/** Creates an server provider that will use `loader()` as the parent ClassLoader for
+	 * the server given by `id`.  This method will retreive/resolve the server jars if they
+	 * have not already been resolved.
+	 */
+	public ServerProvider server(ApplicationID id);
 }

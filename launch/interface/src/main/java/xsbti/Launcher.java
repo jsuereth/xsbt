@@ -1,6 +1,6 @@
 package xsbti;
 
-	import java.io.File;
+import java.io.File;
 
 public interface Launcher
 {
@@ -13,9 +13,17 @@ public interface Launcher
 	 * and instantiate its `xsbti.Main` in a new classloader.
 	 * See [AppProvider] for more details.
 	 * @param id  The artifact coordinates of the application.
-	 * @param version The version to resolve
+	 * @param version The scala version to use, or null for auto.
 	 */
 	public AppProvider app(ApplicationID id, String version);
+	/**
+	 * returns a `ServerProvider` which is able to resolve an server
+	 * and instantiate its `xsbti.ServerMain` in a new classloader.
+	 * See [ServerProvider] for more details.
+	 * @param id  The artifact coordinates of the application.
+	 * @param version The scala version to use or null for auto.
+	 */
+	public ServerProvider server(ApplicationID id, String version);
 	/**
 	 * This returns the "top" classloader for a launched application.   This classlaoder
 	 * lives somewhere *above* that used for the application.   This classloader

@@ -1,5 +1,6 @@
 package xsbti;
 
+/** An enumeration for predefined artifact repositories. */
 public enum Predefined 
 {
 	Local("local"),
