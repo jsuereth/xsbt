@@ -18,6 +18,7 @@ package sbt
 	import Configurations.CompilerPlugin
 	import Types.Id
 	import KeyRanks._
+	import org.apache.ivy.core.cache.SbtModuleDescriptorMemoryCache
 
 object Keys
 {
@@ -240,6 +241,9 @@ object Keys
 	val moduleSettings = TaskKey[ModuleSettings]("module-settings", "Module settings, which configure dependency management for a specific module, such as a project.", DTask)
 	val unmanagedBase = SettingKey[File]("unmanaged-base", "The default directory for manually managed libraries.", ASetting)
 	val updateConfiguration = SettingKey[UpdateConfiguration]("update-configuration", "Configuration for resolving and retrieving managed dependencies.", DSetting)
+	val ivyUseMemoryCache = SettingKey[Boolean]("ivy-use-memory-cache", "If true, ivy will use an in-memory cache for module descriptors between builds.", ASetting)
+	val ivyMemoryCacheSize = SettingKey[Int]("ivy-memory-cache-size", "The number of module descriptors to store in the shared ivy memory cache.", BSetting)
+	val ivyMemoryCache = SettingKey[Option[SbtModuleDescriptorMemoryCache]]("ivy-memory-cache", "A shared memory cache of module descriptors which ivy will share between projects in a build.", DSetting)
 	val ivySbt = TaskKey[IvySbt]("ivy-sbt", "Provides the sbt interface to Ivy.", CTask)
 	val ivyModule = TaskKey[IvySbt#Module]("ivy-module", "Provides the sbt interface to a configured Ivy module.", CTask)
 	val update = TaskKey[UpdateReport]("update", "Resolves and optionally retrieves dependencies, producing a report.", ATask)

@@ -16,7 +16,7 @@ package sbt
 	import std.TaskExtra._
 	import inc.{FileValueCache, IncOptions, Locate}
 	import testing.{Framework, Runner, AnnotatedFingerprint, SubclassFingerprint}
-
+	import org.apache.ivy.core.cache.SbtModuleDescriptorMemoryCache
 	import sys.error
 	import scala.xml.NodeSeq
 	import org.apache.ivy.core.module.{descriptor, id}
@@ -109,7 +109,13 @@ object Defaults extends BuildCommon
 		pomExtra :== NodeSeq.Empty,
 		pomPostProcess :== idFun,
 		pomAllRepositories :== false,
-	  	pomIncludeRepository :== Classpaths.defaultRepositoryFilter
+	  	pomIncludeRepository :== Classpaths.defaultRepositoryFilter,
+	  	ivyUseMemoryCache :== false,
+	  	ivyMemoryCacheSize :== 150,  // Current Ivy Default
+	  	ivyMemoryCache := { 
+	  		if(ivyUseMemoryCache.value) Some(new SbtModuleDescriptorMemoryCache(ivyMemoryCacheSize.value)) 
+	  		else None
+	  	} 
 	  )
 
 	/** Core non-plugin settings for sbt builds.  These *must* be on every build or the sbt engine will fail to run at all. */
@@ -1304,10 +1310,10 @@ object Classpaths
 	def unmanagedDependencies: Initialize[Task[Classpath]] =
 		(thisProjectRef, configuration, settingsData, buildDependencies) flatMap unmanagedDependencies0
 	def mkIvyConfiguration: Initialize[Task[IvyConfiguration]] =
-		(fullResolvers, ivyPaths, otherResolvers, moduleConfigurations, offline, checksums in update, appConfiguration, target, streams) map { (rs, paths, other, moduleConfs, off, check, app, t, s) =>
+		(fullResolvers, ivyPaths, otherResolvers, moduleConfigurations, offline, checksums in update, appConfiguration, target, ivyMemoryCache, streams) map { (rs, paths, other, moduleConfs, off, check, app, t, cache, s) =>
 			warnResolversConflict(rs ++: other, s.log)
 			val resCacheDir = t / "resolution-cache"
-			new InlineIvyConfiguration(paths, rs, other, moduleConfs, off, Option(lock(app)), check, Some(resCacheDir), s.log)
+			new InlineIvyConfiguration(paths, rs, other, moduleConfs, off, Option(lock(app)), check, Some(resCacheDir), cache, s.log)
 		}
 
 		import java.util.LinkedHashSet

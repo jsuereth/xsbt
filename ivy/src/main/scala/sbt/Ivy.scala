@@ -14,7 +14,7 @@ import CS.singleton
 
 import org.apache.ivy.{core, plugins, util, Ivy}
 import core.{IvyPatternHelper, LogOptions}
-import core.cache.{CacheMetadataOptions, DefaultRepositoryCacheManager, ModuleDescriptorWriter}
+import core.cache.{CacheMetadataOptions, DefaultRepositoryCacheManager, ModuleDescriptorWriter, SbtModuleDescriptorMemoryCache}
 import core.module.descriptor.{Artifact => IArtifact, DefaultArtifact, DefaultDependencyArtifactDescriptor, MDArtifact}
 import core.module.descriptor.{DefaultDependencyDescriptor, DefaultModuleDescriptor, DependencyDescriptor, ModuleDescriptor, License}
 import core.module.descriptor.{OverrideDependencyDescriptorMediator}
@@ -74,7 +74,7 @@ final class IvySbt(val configuration: IvyConfiguration)
 			case i: InlineIvyConfiguration =>
 				is.setVariable("ivy.checksums", i.checksums mkString ",")
 				i.paths.ivyHome foreach is.setDefaultIvyUserDir
-				IvySbt.configureCache(is, i.localOnly, i.resolutionCacheDir)
+				IvySbt.configureCache(is, i.localOnly, i.resolutionCacheDir, i.sharedMemoryCache)
 				IvySbt.setResolvers(is, i.resolvers, i.otherResolvers, i.localOnly, configuration.log)
 				IvySbt.setModuleConfigurations(is, i.moduleConfigurations, configuration.log)
 		}
@@ -304,10 +304,10 @@ private object IvySbt
 			settings.addModuleConfiguration(attributes, settings.getMatcher(EXACT_OR_REGEXP), resolver.name, null, null, null)
 		}
 	}
-	private def configureCache(settings: IvySettings, localOnly: Boolean, resCacheDir: Option[File])
+	private def configureCache(settings: IvySettings, localOnly: Boolean, resCacheDir: Option[File], sharedMemoryCache: Option[SbtModuleDescriptorMemoryCache])
 	{
 		configureResolutionCache(settings, localOnly, resCacheDir)
-		configureRepositoryCache(settings, localOnly)
+		configureRepositoryCache(settings, localOnly, sharedMemoryCache)
 	}
 	private[this] def configureResolutionCache(settings: IvySettings, localOnly: Boolean, resCacheDir: Option[File])
 	{
@@ -329,7 +329,7 @@ private object IvySbt
 			new ResolvedModuleRevision(resolved.getResolver, resolved.getResolver, updatedDescriptor, resolved.getReport, resolved.isForce)
 		}
 
-	private[this] def configureRepositoryCache(settings: IvySettings, localOnly: Boolean) //, artifactResolver: DependencyResolver)
+	private[this] def configureRepositoryCache(settings: IvySettings, localOnly: Boolean, cache: Option[SbtModuleDescriptorMemoryCache]) //, artifactResolver: DependencyResolver)
 	{
 		val cacheDir = settings.getDefaultRepositoryCacheBasedir()
 		val manager = new DefaultRepositoryCacheManager("default-cache", settings, cacheDir) {

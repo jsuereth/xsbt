@@ -6,6 +6,7 @@ package sbt
 import java.io.File
 import java.net.{URI,URL}
 import scala.xml.NodeSeq
+import org.apache.ivy.core.cache.SbtModuleDescriptorMemoryCache
 
 final class IvyPaths(val baseDirectory: File, val ivyHome: Option[File])
 {
@@ -18,16 +19,25 @@ sealed trait IvyConfiguration
 	def baseDirectory: File
 	def log: Logger
 	def withBase(newBaseDirectory: File): This
+
+	private[sbt] def sharedMemoryCache: Option[SbtModuleDescriptorMemoryCache]
 }
 final class InlineIvyConfiguration(val paths: IvyPaths, val resolvers: Seq[Resolver], val otherResolvers: Seq[Resolver],
 	val moduleConfigurations: Seq[ModuleConfiguration], val localOnly: Boolean, val lock: Option[xsbti.GlobalLock],
-	val checksums: Seq[String], val resolutionCacheDir: Option[File], val log: Logger) extends IvyConfiguration
+	val checksums: Seq[String], val resolutionCacheDir: Option[File], val sharedMemoryCache: Option[SbtModuleDescriptorMemoryCache], 
+	val log: Logger) extends IvyConfiguration
 {
 	@deprecated("Use the variant that accepts the resolution cache location.", "0.13.0")
 	def this(paths: IvyPaths, resolvers: Seq[Resolver], otherResolvers: Seq[Resolver],
 		moduleConfigurations: Seq[ModuleConfiguration], localOnly: Boolean, lock: Option[xsbti.GlobalLock],
 		checksums: Seq[String], log: Logger) =
-			this(paths, resolvers, otherResolvers, moduleConfigurations, localOnly, lock, checksums, None, log)
+			this(paths, resolvers, otherResolvers, moduleConfigurations, localOnly, lock, checksums, None, None, log)
+
+    @deprecated("Use the variant that accepts the shared in-memory cache.", "0.13.3")
+	def this(paths: IvyPaths, resolvers: Seq[Resolver], otherResolvers: Seq[Resolver],
+	    moduleConfigurations: Seq[ModuleConfiguration], localOnly: Boolean, lock: Option[xsbti.GlobalLock],
+	    checksums: Seq[String], resolutionCacheDir: Option[File], log: Logger) =
+			this(paths, resolvers, otherResolvers, moduleConfigurations, localOnly, lock, checksums, resolutionCacheDir, None, log)
 
 	type This = InlineIvyConfiguration
 	def baseDirectory = paths.baseDirectory
@@ -37,6 +47,8 @@ final class InlineIvyConfiguration(val paths: IvyPaths, val resolvers: Seq[Resol
 final class ExternalIvyConfiguration(val baseDirectory: File, val uri: URI, val lock: Option[xsbti.GlobalLock], val extraResolvers: Seq[Resolver], val log: Logger) extends IvyConfiguration
 {
 	type This = ExternalIvyConfiguration
+	// TODO - Actually expose this for external config.
+	override def sharedMemoryCache = None
 	def withBase(newBase: File) = new ExternalIvyConfiguration(newBase, uri, lock, extraResolvers, log)
 }
 object ExternalIvyConfiguration
