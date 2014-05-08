@@ -3,6 +3,11 @@
  */
 package sbt
 
+/**
+ * Represents an event fired from a logger.
+ *
+ * This is used to in both log buffering and in async-based loggers.
+ */
 sealed trait LogEvent extends NotNull
 final class Success(val msg: String) extends LogEvent
 final class Log(val level: Level.Value, val msg: String) extends LogEvent

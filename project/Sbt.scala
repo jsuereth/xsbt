@@ -63,7 +63,7 @@ object Sbt extends Build {
   // Command line-related utilities.
   lazy val completeSub = testedBaseProject(utilPath / "complete", "Completion") dependsOn (collectionSub, controlSub, ioSub) settings (jline)
   // logging
-  lazy val logSub = testedBaseProject(utilPath / "log", "Logging") dependsOn (interfaceSub, processSub) settings (jline)
+  lazy val logSub = testedBaseProject(utilPath / "log", "Logging") dependsOn (interfaceSub, processSub) settings (jline, disruptor)
   // Relation
   lazy val relationSub = testedBaseProject(utilPath / "relation", "Relation") dependsOn (interfaceSub, processSub)
   // class file reader and analyzer
