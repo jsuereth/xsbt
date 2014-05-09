@@ -12,7 +12,7 @@ object DisruptorLogManagerTest extends Properties("DisruptorLogManager") {
   /* Tests that content written through a LoggerWriter is properly passed to the underlying Logger.
 	* Each line, determined by the specified newline separator, must be logged at the correct logging level. */
   property("properly logged, one thread") = forAll { (lines: Seq[LogLine]) =>
-    object Appender extends LogAppender[String] {
+    object Appender extends LogStreamHandler[String] {
       val recorded: collection.mutable.ListBuffer[LogLine] =
         collection.mutable.ListBuffer.empty
       def close(): Unit = ()
